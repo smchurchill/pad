@@ -1,4 +1,4 @@
-defmodule Event.Mixfile do
+defmodule PAD.Mixfile do
   use Mix.Project
 
   def project do
