@@ -3,11 +3,72 @@ defmodule Server do
   Record.defrecord :state, [:events, :clients]
   Record.defrecord :event, [:name, :description, :id, timeout: {{3000,1,1},{0,0,0}}]
 
+  def start do
+    id = spawn(__MODULE__, :init, [])
+    IO.puts(:erlang.is_atom __MODULE__)
+    #Process.register(id, :__MODULE__)
+    #id
+  end
+
+  def start_link do
+    Process.register(id = spawn_link(__MODULE__, :init, []), __MODULE__)
+    id
+  end
+
+  def terminate do
+    send __MODULE__, :shutdown
+  end
+
+  def subscribe(client) do
+    ref = Process.monitor(client)
+    send __MODULE__, {self, ref, {:subscribe, client}}
+    receive do
+      {^ref, :ok} ->
+        {:ok, ref}
+      {'DOWN', _ref, :process, _pid, reason} ->
+        {:error, reason}
+    after 5000 ->
+      {:error, :timeout}
+    end   
+  end
+
+  def add_event(name, description, timeout) do
+    ref = make_ref
+    send __MODULE__, {self, ref, {:add, name, description, timeout}}
+    receive do
+      {^ref, msg} ->
+        msg
+    after 5000 ->
+      {:error, :timeout}
+    end
+  end
+
+  def cancel(name) do
+    ref = make_ref
+    send __MODULE__, {self, ref, {:cancel, name}}
+    receive do
+      {^ref, :ok} ->
+        :ok
+    after 5000 ->
+      {:error, :timeout}
+    end
+  end
+
+  def listen(delay) do
+    receive do
+      m = {:done, _name, _description} ->
+        [m | listen(0)]
+    after 1000*delay ->
+        []
+    end
+  end
+
+  
 
 
   def init do
-    loop( state( events: Orddict.new, 
-                 clients: Orddict.new))
+    loop( state( events: :orddict.new, 
+                 clients: :orddict.new))
   end
 
   def loop( s = state(events: old_events,
@@ -15,7 +76,7 @@ defmodule Server do
     receive do
       {from, msg_ref, {:subscribe, client}} ->
         client_ref = Process.monitor(client)
-        new_clients = Orddict.store(client_ref,
+        new_clients = :orddict.store(client_ref,
                                     client,
                                     state(s, :clients))
         send from, {msg_ref, :ok}
@@ -28,7 +89,7 @@ defmodule Server do
         case valid_datetime(timeout) do
           true ->
             event_pid = Event.start_link(name, timeout)
-            new_events = Orddict.store(
+            new_events = :orddict.store(
               name,
               event(
                 name: name,
@@ -46,10 +107,10 @@ defmodule Server do
         end
 
       {from, msg_ref, {:cancel, name}} ->
-        new_events = case Orddict.find(name, old_events) do
+        new_events = case :orddict.find(name, old_events) do
           {:ok, e} ->
             Event.cancel(event(e, :id))
-            Orddict.erase(name, old_events)
+            :orddict.erase(name, old_events)
           :error ->
             old_events
           end
@@ -60,14 +121,14 @@ defmodule Server do
             clients: old_clients) )            
       
       {:done, name} ->
-        case Orddict.find(name, old_events) do
+        case :orddict.find(name, old_events) do
           {:ok, e} ->
             send_to_clients(
               {  :done,
                  event(e, :name),
                  event(e, :description)},
               old_clients)
-            new_events = Orddict.erase(name, old_events)
+            new_events = :orddict.erase(name, old_events)
             loop(
               state(
                 events: new_events,
@@ -81,9 +142,9 @@ defmodule Server do
         
       {'DOWN', client_ref, :process, _id, _reason} ->
         new_clients =
-          case Orddict.find(client_ref, old_clients) do
+          case :orddict.find(client_ref, old_clients) do
             {:ok, _} ->
-              Orddict.erase(client_ref, old_clients)
+              :orddict.erase(client_ref, old_clients)
             :error ->
               old_clients
           end
@@ -94,7 +155,7 @@ defmodule Server do
             
       
       :code_change ->
-        Server.loop(s)
+        __MODULE__.loop(s)
       
       _unknown ->
         :io.format("Unknown message: ~p~n", [Unknown])
@@ -103,7 +164,7 @@ defmodule Server do
   end
 
   def send_to_clients(msg, client_dict) do
-    Orddict.map(
+    :orddict.map(
       fn(_ref, id) ->
         send id, msg
       end,

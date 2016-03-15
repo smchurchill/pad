@@ -3,11 +3,11 @@ defmodule Event do
   Record.defrecord :state, [:server, :name, :to_go]
   
   def start(event_name, delay) do
-    spawn(Event, :init, [self, event_name, delay])
+    spawn(__MODULE__, :init, [self, event_name, delay])
   end
   
   def start_link(event_name, delay) do
-    spawn_link(Event, :init, [self, event_name, delay])
+    spawn_link(__MODULE__, :init, [self, event_name, delay])
   end
   
   def init(server, event_name, datetime) do
@@ -20,10 +20,10 @@ defmodule Event do
     ref = Process.monitor(to_cancel)
     send to_cancel, {self, ref, :cancel}
     receive do
-      {ref, :ok} ->
+      {^ref, :ok} ->
         Process.demonitor(ref, [:flush])
         :ok
-      {'DOWN', _ref, :process, _to_cancel, _reason} ->
+      {'DOWN', ^ref, :process, _to_cancel, _reason} ->
         :ok
     end 
   end

@@ -3,6 +3,65 @@ defmodule Server do
   Record.defrecord :state, [:events, :clients]
   Record.defrecord :event, [:name, :description, :id, timeout: {{3000,1,1},{0,0,0}}]
 
+  def start do
+    Process.register(id = spawn(__MODULE__, :init, []), __MODULE__)
+    id
+  end
+
+  def start_link do
+    Process.register(id = spawn_link(__MODULE__, :init, []), __MODULE__)
+    id
+  end
+
+  def terminate do
+    send __MODULE__, :shutdown
+  end
+
+  def subscribe(client) do
+    ref = Process.monitor(client)
+    send __MODULE__, {self, ref, {:subscribe, client}}
+    receive do
+      {^ref, :ok} ->
+        {:ok, ref}
+      {'DOWN', _ref, :process, _pid, reason} ->
+        {:error, reason}
+    after 5000 ->
+      {:error, :timeout}
+    end   
+  end
+
+  def add_event(name, description, timeout) do
+    ref = make_ref
+    send __MODULE__, {self, ref, {:add, name, description, timeout}}
+    receive do
+      {^ref, msg} ->
+        msg
+    after 5000 ->
+      {:error, :timeout}
+    end
+  end
+
+  def cancel(name) do
+    ref = make_ref
+    send __MODULE__, {self, ref, {:cancel, name}}
+    receive do
+      {^ref, :ok} ->
+        :ok
+    after 5000 ->
+      {:error, :timeout}
+    end
+  end
+
+  def listen(delay) do
+    receive do
+      m = {:done, _name, _description} ->
+        [m | listen(0)]
+    after 1000*delay ->
+        []
+    end
+  end
+
+  
 
 
   def init do
@@ -94,7 +153,7 @@ defmodule Server do
             
       
       :code_change ->
-        Server.loop(s)
+        __MODULE__.loop(s)
       
       _unknown ->
         :io.format("Unknown message: ~p~n", [Unknown])

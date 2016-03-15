@@ -1,14 +1,13 @@
 defmodule Event do
-  @module = Event
   require Record
   Record.defrecord :state, [:server, :name, :to_go]
   
   def start(event_name, delay) do
-    spawn(Event, :init, [self, event_name, delay])
+    spawn(__MODULE__, :init, [self, event_name, delay])
   end
   
   def start_link(event_name, delay) do
-    spawn_link(Event, :init, [self, event_name, delay])
+    spawn_link(__MODULE__, :init, [self, event_name, delay])
   end
   
   def init(server, event_name, datetime) do
