@@ -1,2 +1,0 @@
-defmodule Supervisor do
-end
