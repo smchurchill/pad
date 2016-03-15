@@ -1,4 +1,5 @@
 defmodule Event do
+  @module = Event
   require Record
   Record.defrecord :state, [:server, :name, :to_go]
   

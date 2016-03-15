@@ -6,8 +6,8 @@ defmodule Server do
 
 
   def init do
-    loop( state( events: :orddict.new, 
-                 clients: :orddict.new))
+    loop( state( events: Orddict.new, 
+                 clients: Orddict.new))
   end
 
   def loop( s = state(events: old_events,
@@ -15,7 +15,7 @@ defmodule Server do
     receive do
       {from, msg_ref, {:subscribe, client}} ->
         client_ref = Process.monitor(client)
-        new_clients = :orddict.store(client_ref,
+        new_clients = Orddict.store(client_ref,
                                     client,
                                     state(s, :clients))
         send from, {msg_ref, :ok}
@@ -28,7 +28,7 @@ defmodule Server do
         case valid_datetime(timeout) do
           true ->
             event_pid = Event.start_link(name, timeout)
-            new_events = :orddict.store(
+            new_events = Orddict.store(
               name,
               event(
                 name: name,
@@ -46,10 +46,10 @@ defmodule Server do
         end
 
       {from, msg_ref, {:cancel, name}} ->
-        new_events = case :orddict.find(name, old_events) do
+        new_events = case Orddict.find(name, old_events) do
           {:ok, e} ->
             Event.cancel(event(e, :id))
-            :orddict.erase(name, old_events)
+            Orddict.erase(name, old_events)
           :error ->
             old_events
           end
@@ -60,14 +60,14 @@ defmodule Server do
             clients: old_clients) )            
       
       {:done, name} ->
-        case :orddict.find(name, old_events) do
+        case Orddict.find(name, old_events) do
           {:ok, e} ->
             send_to_clients(
               {  :done,
                  event(e, :name),
                  event(e, :description)},
               old_clients)
-            new_events = :orddict.erase(name, old_events)
+            new_events = Orddict.erase(name, old_events)
             loop(
               state(
                 events: new_events,
@@ -81,9 +81,9 @@ defmodule Server do
         
       {'DOWN', client_ref, :process, _id, _reason} ->
         new_clients =
-          case :orddict.find(client_ref, old_clients) do
+          case Orddict.find(client_ref, old_clients) do
             {:ok, _} ->
-              :orddict.erase(client_ref, old_clients)
+              Orddict.erase(client_ref, old_clients)
             :error ->
               old_clients
           end
@@ -103,7 +103,7 @@ defmodule Server do
   end
 
   def send_to_clients(msg, client_dict) do
-    :orddict.map(
+    Orddict.map(
       fn(_ref, id) ->
         send id, msg
       end,
